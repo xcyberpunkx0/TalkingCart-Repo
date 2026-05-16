@@ -44,7 +44,7 @@ namespace TalkingCart.Patches
         // Returns the cart that the player is grabbing.
         public static CartTalkingManager GetGrabbedCart()
         {
-            if (PlayerAvatarPatch.localPlayerPhysGrabber.grabbedObjectTransform != null)
+            if (PlayerAvatarPatch.localPlayerPhysGrabber != null && PlayerAvatarPatch.localPlayerPhysGrabber.grabbedObjectTransform != null)
                 return PlayerAvatarPatch.localPlayerPhysGrabber.grabbedObjectTransform.GetComponent<CartTalkingManager>();
             return null;
         }
