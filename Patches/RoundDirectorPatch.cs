@@ -39,6 +39,14 @@ namespace TalkingCart.Patches
         public static List<string> roundEnemyNamesList = new List<string>();
         public static List<EnemyStatus> currentEnemyStatus = new List<EnemyStatus>();
 
+        public static string GetEnemyDisplayName(string enemyName)
+        {
+            if (enemyName == "Apex Predator")
+                return "Duck";
+
+            return string.IsNullOrEmpty(enemyName) ? "Enemy" : enemyName;
+        }
+
         [HarmonyPatch("Start")]
         [HarmonyPrefix]
         static void StartPatch()

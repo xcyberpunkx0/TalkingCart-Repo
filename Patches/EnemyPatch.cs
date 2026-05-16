@@ -15,7 +15,7 @@ namespace TalkingCart.Patches
         [HarmonyPostfix]
         static void GetEnemyListedPatch(Enemy __instance, ref EnemyParent ___EnemyParent)
         {
-            TalkingCartBase.mls.LogInfo($"Enemy Spawned: {___EnemyParent.enemyName}");
+            TalkingCartBase.mls.LogInfo($"Enemy Spawned: {RoundDirectorPatch.GetEnemyDisplayName(___EnemyParent.enemyName)}");
             RoundDirectorPatch.AddEnemy(___EnemyParent, __instance);
             // This is doable because the carts are instantiated before the enemies.
             CartVocalPatch.AddEnemyRecordToAllCarts();

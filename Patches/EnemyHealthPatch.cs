@@ -17,6 +17,9 @@ namespace TalkingCart.Patches
             if (ConfigManager.warnAboutEnemies.Value)
             {
                 int enemyInd = RoundDirectorPatch.enemyList.IndexOf(___enemy);
+                if (enemyInd < 0)
+                    return;
+
                 foreach (CartTalkingManager cart in CartVocalPatch.carts)
                 {
                     cart.HandleDeadEnemy(enemyInd);

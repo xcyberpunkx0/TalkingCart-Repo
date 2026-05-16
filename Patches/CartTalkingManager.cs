@@ -36,6 +36,7 @@ namespace TalkingCart.Patches
         public List<EnemyCommState> lastCommunicatedStatus = new List<EnemyCommState>();
         public List<bool> isEnemyNearby = new List<bool>();
         public List<int> despawnRespawnTimer = new List<int>();
+        const int CartTTSVoiceFrequency = 310;
 
         float cartVoiceTimer = 0f; // These are used to stop the cart from starting a new sentence when it's already in the process of finishing a sentence.
         float checkTimer = 1f; // Timer for checking nearby enemies.
@@ -81,11 +82,11 @@ namespace TalkingCart.Patches
             cartSpeech = speechObject.AddComponent<Speech>();
             cartSpeech.useStreamingMode = true;
             cartSpeech.maxAutoCachedClips = 10;
-            cartSpeech.voiceBaseFrequency = 220;
+            cartSpeech.voiceBaseFrequency = CartTTSVoiceFrequency;
             cartSpeech.voicingSource = SpeechSynth.VoicingSource.natural;
             cartSpeech.msPerSpeechFrame = 10;
-            cartSpeech.flutter = 10;
-            cartSpeech.flutterSpeed = 1;
+            cartSpeech.flutter = 6;
+            cartSpeech.flutterSpeed = 2;
         }
 
         void Start()
@@ -107,6 +108,8 @@ namespace TalkingCart.Patches
 
         void Update()
         {
+            EnsureEnemyRecordsSynced();
+
             // Communicate the starter enemies if it's a non shop level and it's the first cart grab of the level.
             if (ConfigManager.warnAboutEnemies.Value && !RoundDirectorPatch.initialEnemiesCommunicated && SemiFunc.RunIsLevel())
             {
@@ -114,7 +117,7 @@ namespace TalkingCart.Patches
                 Vector3 cartPos = new Vector3(transform.position.x, 0, transform.position.z);
                 float distanceToPlayer = Vector3.Distance(cartPos, playerPos);
 
-                if(distanceToPlayer < 8f)
+                if(distanceToPlayer < 8f && PlayerControllerPatch.GetGrabbedCart() == this)
                 {
                     RoundDirectorPatch.initialEnemiesCommunicated = true;
                     HandleStarterEnemies();
@@ -201,6 +204,145 @@ namespace TalkingCart.Patches
         /*************ENEMY COMMS HANDLING*************/
         /**********************************************/
 
+        void EnsureEnemyRecordsSynced()
+        {
+            int enemyCount = RoundDirectorPatch.enemyList.Count;
+
+            while (isEnemyNearby.Count < enemyCount) isEnemyNearby.Add(false);
+            while (lastCommunicatedStatus.Count < enemyCount) lastCommunicatedStatus.Add(EnemyCommState.None);
+            while (despawnRespawnTimer.Count < enemyCount) despawnRespawnTimer.Add(0);
+
+            if (isEnemyNearby.Count > enemyCount) isEnemyNearby.RemoveRange(enemyCount, isEnemyNearby.Count - enemyCount);
+            if (lastCommunicatedStatus.Count > enemyCount) lastCommunicatedStatus.RemoveRange(enemyCount, lastCommunicatedStatus.Count - enemyCount);
+            if (despawnRespawnTimer.Count > enemyCount) despawnRespawnTimer.RemoveRange(enemyCount, despawnRespawnTimer.Count - enemyCount);
+        }
+
+        bool IsValidEnemyIndex(int enemyInd)
+        {
+            return enemyInd >= 0 &&
+                enemyInd < RoundDirectorPatch.enemyList.Count &&
+                enemyInd < RoundDirectorPatch.enemyParentList.Count &&
+                enemyInd < RoundDirectorPatch.currentEnemyStatus.Count &&
+                enemyInd < isEnemyNearby.Count &&
+                enemyInd < lastCommunicatedStatus.Count &&
+                enemyInd < despawnRespawnTimer.Count;
+        }
+
+        bool TryGetBundledClip(string clipName, out AudioClip audioClip)
+        {
+            audioClip = null;
+            return !ConfigManager.alwaysUseGameTTSToVoiceCart.Value &&
+                TalkingCartBase.SoundFXByName != null &&
+                TalkingCartBase.SoundFXByName.TryGetValue(clipName, out audioClip) &&
+                audioClip != null;
+        }
+
+        bool EnqueueBundledClip(string clipName, string displayText, float delay = 0.2f)
+        {
+            if (!TryGetBundledClip(clipName, out AudioClip audioClip))
+                return false;
+
+            EnqueueValues(audioClip, delay, displayText);
+            return true;
+        }
+
+        void EnqueueTextAsTTS(string displayText, float delay = 0f, string speechText = null)
+        {
+            string textToSpeak = string.IsNullOrEmpty(speechText) ? displayText : speechText;
+            List<AudioClip> audioClips = TTSGenerateAudioClip(textToSpeak);
+            foreach (AudioClip audioClip in audioClips) EnqueueValues(audioClip, delay, displayText);
+        }
+
+        string GetEnemyDisplayName(string enemyName)
+        {
+            return RoundDirectorPatch.GetEnemyDisplayName(enemyName);
+        }
+
+        string GetEnemyDisplayNamePlural(string enemyName)
+        {
+            string displayName = GetEnemyDisplayName(enemyName);
+            int vanillaEnemyNameInd = Array.IndexOf(RoundDirectorPatch.enemyNames, enemyName);
+            if (vanillaEnemyNameInd >= 0 && vanillaEnemyNameInd < RoundDirectorPatch.enemyNamesTextPlural.Length)
+                return RoundDirectorPatch.enemyNamesTextPlural[vanillaEnemyNameInd];
+
+            return displayName + "s";
+        }
+
+        string GetEnemySpeechName(string enemyName)
+        {
+            switch (enemyName)
+            {
+                case "Apex Predator":
+                    return "Duck";
+                case "Headman":
+                    return "Head man";
+                case "Headgrab":
+                    return "Head grab";
+                case "Heart Hugger":
+                    return "Heart hugger";
+                case "Shadow Child":
+                    return "Shadow child";
+                case "Upscream":
+                    return "Up scream";
+                default:
+                    return GetEnemyDisplayName(enemyName);
+            }
+        }
+
+        string GetEnemySpeechNamePlural(string enemyName)
+        {
+            if (enemyName == "Apex Predator")
+                return "Ducks";
+
+            return GetEnemySpeechName(enemyName) + "s";
+        }
+
+        string GetEnemyClipPrefix(string enemyName)
+        {
+            switch (enemyName)
+            {
+                case "Apex Predator":
+                    return "duck";
+                case "Shadow Child":
+                    return "shadow_child";
+                default:
+                    return GetEnemyDisplayName(enemyName).ToLowerInvariant().Replace(" ", "_");
+            }
+        }
+
+        string GetEnemyPluralClipPrefix(string enemyName)
+        {
+            switch (enemyName)
+            {
+                case "Apex Predator":
+                    return "ducks";
+                case "Banger":
+                    return "bangers";
+                case "Gnome":
+                    return "gnomes";
+                case "Headman":
+                    return "headmen";
+                case "Huntsman":
+                    return "huntsmen";
+                case "Shadow Child":
+                    return "shadow_children";
+                default:
+                    return GetEnemyClipPrefix(enemyName) + "s";
+            }
+        }
+
+        void EnqueueEnemyVoiceLine(string enemyName, string actionText)
+        {
+            string displayText = GetEnemyDisplayName(enemyName) + " " + actionText;
+            string speechText = GetEnemySpeechName(enemyName) + " " + actionText;
+            string clipName = GetEnemyClipPrefix(enemyName) + "_" + actionText;
+
+            if (EnqueueBundledClip(clipName, displayText))
+                return;
+
+            EnqueueTextAsTTS(displayText, speechText: speechText);
+        }
+
         void HandleStarterEnemies()
         {
             // Communicate first sentence.
@@ -211,7 +353,8 @@ namespace TalkingCart.Patches
                 foreach (AudioClip audioClip in audioClips) EnqueueValues(audioClip, 0f, fullText);
             } else
             {
-                EnqueueValues(TalkingCartBase.SoundFX[TalkingCartBase.LevelEnemiesVLInd], 0.2f, "Level enemies:");
+                if (!EnqueueBundledClip("level_enemies", "Level enemies:"))
+                    EnqueueTextAsTTS("Level enemies:");
             }
 
             // Record number of enemies.
@@ -219,6 +362,7 @@ namespace TalkingCart.Patches
             foreach (EnemyParent enemyParent in RoundDirectorPatch.enemyParentList)
             {
                 int ind = RoundDirectorPatch.roundEnemyNamesList.IndexOf(enemyParent.enemyName);
+                if (ind < 0) continue;
                 enemiesCount[ind]++;
             }
 
@@ -235,32 +379,41 @@ namespace TalkingCart.Patches
                 if (vanillaEnemyNameInd == -1 || ConfigManager.alwaysUseGameTTSToVoiceCart.Value)
                 {
                     // Enemy is modded. Or always use game tts is on.
-                    string fullText = eName;
-                    if(eCount > 1) fullText = eCount.ToString() + " " + eName;
+                    string displayText = GetEnemyDisplayName(eName);
+                    string speechText = GetEnemySpeechName(eName);
+                    if(eCount > 1)
+                    {
+                        displayText = eCount.ToString() + " " + GetEnemyDisplayNamePlural(eName);
+                        speechText = eCount.ToString() + " " + GetEnemySpeechNamePlural(eName);
+                    }
 
-                    List<AudioClip> audioClips = TTSGenerateAudioClip(fullText);
-                    foreach (AudioClip audioClip in audioClips) EnqueueValues(audioClip, 0, fullText);
+                    EnqueueTextAsTTS(displayText, speechText: speechText);
 
                 } else
                 {
                     // If there is 1 of that enemy, no need to communicate a number.
                     if (eCount == 1)
                     {
-                        int vlInd = TalkingCartBase.EnemyNamesSingularInd + vanillaEnemyNameInd;
-                        EnqueueValues(TalkingCartBase.SoundFX[vlInd], 0.2f, RoundDirectorPatch.enemyNamesTextSingular[vanillaEnemyNameInd]);
+                        string displayText = GetEnemyDisplayName(eName);
+                        if (!EnqueueBundledClip(GetEnemyClipPrefix(eName) + "_name_singluar", displayText))
+                            EnqueueTextAsTTS(displayText, speechText: GetEnemySpeechName(eName));
                     }
                     else
                     {
                         // This will for example write "4 Gnomes" twice instead of writing "4" alone and "Gnomes" alone.
-                        string fullText = eCount.ToString() + " " + RoundDirectorPatch.enemyNamesTextPlural[vanillaEnemyNameInd];
+                        string displayText = eCount.ToString() + " " + GetEnemyDisplayNamePlural(eName);
+                        string speechText = eCount.ToString() + " " + GetEnemySpeechNamePlural(eName);
+                        string numberClipName = eCount.ToString("00");
+                        string enemyClipName = GetEnemyPluralClipPrefix(eName) + "_name_plural";
 
-                        // Adding the number vl
-                        int numberVLInd = TalkingCartBase.NumbersInd + eCount;
-                        EnqueueValues(TalkingCartBase.SoundFX[numberVLInd], -0.2f, fullText);
+                        if (TryGetBundledClip(numberClipName, out AudioClip numberClip) && TryGetBundledClip(enemyClipName, out AudioClip enemyClip))
+                        {
+                            EnqueueValues(numberClip, -0.2f, displayText);
+                            EnqueueValues(enemyClip, 0.2f, displayText);
+                            continue;
+                        }
 
-                        // Adding the enemy name vl
-                        int vlInd = TalkingCartBase.EnemyNamesPluralInd + vanillaEnemyNameInd;
-                        EnqueueValues(TalkingCartBase.SoundFX[vlInd], 0.2f, fullText);
+                        EnqueueTextAsTTS(displayText, speechText: speechText);
                     }
                 }
 
@@ -275,6 +428,8 @@ namespace TalkingCart.Patches
             // Check nearby enemies.
             for (int i = 0; i < RoundDirectorPatch.enemyList.Count; i++)
             {
+                if (!IsValidEnemyIndex(i)) continue;
+
                 try
                 {
                     EnemyParent enemyParent = RoundDirectorPatch.enemyParentList[i];
@@ -301,20 +456,17 @@ namespace TalkingCart.Patches
                     // If enemy is near and we haven't communicated that already.
                     if (distance < 20f && !isEnemyNearby[i])
                     {
-                        TalkingCartBase.mls.LogInfo($"Enemy Nearby: {enemyParent.enemyName}");
+                        TalkingCartBase.mls.LogInfo($"Enemy Nearby: {GetEnemyDisplayName(enemyParent.enemyName)}");
 
                         if (vanillaEnemyNameInd == -1 || ConfigManager.alwaysUseGameTTSToVoiceCart.Value)
                         {
                             // Enemy is modded
-                            string fullText = enemyParent.enemyName + " nearby";
-                            List<AudioClip> audioClips = TTSGenerateAudioClip(fullText);
-                            foreach (AudioClip audioClip in audioClips) EnqueueValues(audioClip, 0, fullText);
+                            EnqueueEnemyVoiceLine(enemyParent.enemyName, "nearby");
 
                         }
                         else
                         {
-                            int voiceLineInd = TalkingCartBase.EnemyNearbyInd + vanillaEnemyNameInd;
-                            EnqueueValues(TalkingCartBase.SoundFX[voiceLineInd], 0.2f, RoundDirectorPatch.enemyNamesTextSingular[vanillaEnemyNameInd] + " nearby");
+                            EnqueueEnemyVoiceLine(enemyParent.enemyName, "nearby");
                         }
 
                         isEnemyNearby[i] = true;
@@ -322,19 +474,16 @@ namespace TalkingCart.Patches
                     }
                     else if (distance > 23f && isEnemyNearby[i]) // A 3 unit buffer so that the cart doesn't spam.
                     {
-                        TalkingCartBase.mls.LogInfo($"Enemy Left Area: {enemyParent.enemyName}");
+                        TalkingCartBase.mls.LogInfo($"Enemy Left Area: {GetEnemyDisplayName(enemyParent.enemyName)}");
 
                         if (vanillaEnemyNameInd == -1 || ConfigManager.alwaysUseGameTTSToVoiceCart.Value)
                         {
                             // Enemy is modded
-                            string fullText = enemyParent.enemyName + " left";
-                            List<AudioClip> audioClips = TTSGenerateAudioClip(fullText);
-                            foreach (AudioClip audioClip in audioClips) EnqueueValues(audioClip, 0, fullText);
+                            EnqueueEnemyVoiceLine(enemyParent.enemyName, "left");
                         }
                         else
                         {
-                            int voiceLineInd = TalkingCartBase.EnemyLeftInd + vanillaEnemyNameInd;
-                            EnqueueValues(TalkingCartBase.SoundFX[voiceLineInd], 0.2f, RoundDirectorPatch.enemyNamesTextSingular[vanillaEnemyNameInd] + " left");
+                            EnqueueEnemyVoiceLine(enemyParent.enemyName, "left");
                         }
 
                         isEnemyNearby[i] = false;
@@ -363,6 +512,8 @@ namespace TalkingCart.Patches
             // We loop through the enemies to see which has despawned.
             for (int i = 0; i < RoundDirectorPatch.enemyList.Count; i++)
             {
+                if (!IsValidEnemyIndex(i)) continue;
+
                 // If this enemy is not absent, continue.
                 if (RoundDirectorPatch.currentEnemyStatus[i] != EnemyStatus.Absent)
                     continue;
@@ -377,20 +528,17 @@ namespace TalkingCart.Patches
                 if (despawnRespawnTimer[i] >= 3) // Enemy must remain despawned for 3 second before we communicate to player.
                 {
                     EnemyParent enemyParent = RoundDirectorPatch.enemyParentList[i];
-                    TalkingCartBase.mls.LogInfo($"Enemy Despawned End: {enemyParent.enemyName}");
+                    TalkingCartBase.mls.LogInfo($"Enemy Despawned End: {GetEnemyDisplayName(enemyParent.enemyName)}");
 
                     int vanillaEnemyNameInd = Array.IndexOf(RoundDirectorPatch.enemyNames, enemyParent.enemyName);
 
                     if(vanillaEnemyNameInd == -1 || ConfigManager.alwaysUseGameTTSToVoiceCart.Value)
                     {
                         // Enemy is modded.
-                        string fullText = enemyParent.enemyName + " despawned";
-                        List<AudioClip> audioClips = TTSGenerateAudioClip(fullText);
-                        foreach (AudioClip audioClip in audioClips) EnqueueValues(audioClip, 0, fullText);
+                        EnqueueEnemyVoiceLine(enemyParent.enemyName, "despawned");
                     } else
                     {
-                        int voiceLineInd = TalkingCartBase.EnemyDespawnedInd + vanillaEnemyNameInd;
-                        EnqueueValues(TalkingCartBase.SoundFX[voiceLineInd], 0.2f, RoundDirectorPatch.enemyNamesTextSingular[vanillaEnemyNameInd] + " despawned");
+                        EnqueueEnemyVoiceLine(enemyParent.enemyName, "despawned");
                     }
                         
 
@@ -406,6 +554,8 @@ namespace TalkingCart.Patches
             // We loop through the enemies to see which has respawned.
             for (int i = 0; i < RoundDirectorPatch.enemyList.Count; i++)
             {
+                if (!IsValidEnemyIndex(i)) continue;
+
                 // If this enemy is absent, continue.
                 if (RoundDirectorPatch.currentEnemyStatus[i] != EnemyStatus.Present)
                     continue;
@@ -420,21 +570,18 @@ namespace TalkingCart.Patches
                 if (despawnRespawnTimer[i] <= -3) // Enemy must remain respawned for 3 second before we communicate to player.
                 {
                     EnemyParent enemyParent = RoundDirectorPatch.enemyParentList[i];
-                    TalkingCartBase.mls.LogInfo($"Enemy Respawned End: {enemyParent.enemyName}");
+                    TalkingCartBase.mls.LogInfo($"Enemy Respawned End: {GetEnemyDisplayName(enemyParent.enemyName)}");
 
                     int vanillaEnemyNameInd = Array.IndexOf(RoundDirectorPatch.enemyNames, enemyParent.enemyName);
 
                     if (vanillaEnemyNameInd == -1 || ConfigManager.alwaysUseGameTTSToVoiceCart.Value)
                     {
                         // Enemy is modded.
-                        string fullText = enemyParent.enemyName + " respawned";
-                        List<AudioClip> audioClips = TTSGenerateAudioClip(fullText);
-                        foreach (AudioClip audioClip in audioClips) EnqueueValues(audioClip, 0, fullText);
+                        EnqueueEnemyVoiceLine(enemyParent.enemyName, "respawned");
                     }
                     else
                     {
-                        int voiceLineInd = TalkingCartBase.EnemyRespawnedInd + vanillaEnemyNameInd;
-                        EnqueueValues(TalkingCartBase.SoundFX[voiceLineInd], 0.2f, RoundDirectorPatch.enemyNamesTextSingular[vanillaEnemyNameInd] + " respawned");
+                        EnqueueEnemyVoiceLine(enemyParent.enemyName, "respawned");
                     }
 
                     lastCommunicatedStatus[i] = EnemyCommState.Respawned;
@@ -446,6 +593,9 @@ namespace TalkingCart.Patches
 
         public void HandleDeadEnemy(int enemyInd)
         {
+            EnsureEnemyRecordsSynced();
+            if (!IsValidEnemyIndex(enemyInd)) return;
+
             // If this enemy's death/despawn was already communicated, return.
             if (lastCommunicatedStatus[enemyInd] == EnemyCommState.Despawned || lastCommunicatedStatus[enemyInd] == EnemyCommState.Dead)
             {
@@ -454,7 +604,7 @@ namespace TalkingCart.Patches
             }
 
             EnemyParent enemyParent = RoundDirectorPatch.enemyParentList[enemyInd];
-            TalkingCartBase.mls.LogInfo($"Enemy Died End: {enemyParent.enemyName}");
+            TalkingCartBase.mls.LogInfo($"Enemy Died End: {GetEnemyDisplayName(enemyParent.enemyName)}");
 
             int vanillaEnemyNameInd = Array.IndexOf(RoundDirectorPatch.enemyNames, enemyParent.enemyName);
             if (vanillaEnemyNameInd == 1 || vanillaEnemyNameInd == 11) // Gnomes and Bangers
@@ -464,14 +614,11 @@ namespace TalkingCart.Patches
             if (vanillaEnemyNameInd == -1 || ConfigManager.alwaysUseGameTTSToVoiceCart.Value)
             {
                 // Enemy is modded.
-                string fullText = enemyParent.enemyName + " died";
-                List<AudioClip> audioClips = TTSGenerateAudioClip(fullText);
-                foreach (AudioClip audioClip in audioClips) EnqueueValues(audioClip, 0, fullText);
+                EnqueueEnemyVoiceLine(enemyParent.enemyName, "died");
             }
             else
             {
-                int voiceLineInd = TalkingCartBase.EnemyDiedInd + vanillaEnemyNameInd;
-                EnqueueValues(TalkingCartBase.SoundFX[voiceLineInd], 0.2f, RoundDirectorPatch.enemyNamesTextSingular[vanillaEnemyNameInd] + " died");
+                EnqueueEnemyVoiceLine(enemyParent.enemyName, "died");
             }
 
             lastCommunicatedStatus[enemyInd] = EnemyCommState.Dead;
@@ -516,12 +663,16 @@ namespace TalkingCart.Patches
             } else
             {
                 // Adding the number vl
-                int numberVLInd = TalkingCartBase.NumbersInd + valuablesNearbyCount;
-                EnqueueValues(TalkingCartBase.SoundFX[numberVLInd], -0.2f, fullText);
-
-                // Adding the enemy name vl
-                int vlInd = TalkingCartBase.ItemsNearbyVLInd;
-                EnqueueValues(TalkingCartBase.SoundFX[vlInd], 0.2f, fullText);
+                string numberClipName = valuablesNearbyCount.ToString("00");
+                if (TryGetBundledClip(numberClipName, out AudioClip numberClip) && TryGetBundledClip("items_nearby", out AudioClip itemsClip))
+                {
+                    EnqueueValues(numberClip, -0.2f, fullText);
+                    EnqueueValues(itemsClip, 0.2f, fullText);
+                }
+                else
+                {
+                    EnqueueTextAsTTS(fullText);
+                }
             }
         }
 
@@ -539,10 +690,10 @@ namespace TalkingCart.Patches
                 speakSB.Length = 0;
                 speakSB.Append(word);
 
-                SpeechClip speechClip = (SpeechClip)ReflectionHelper.InvokePrivateMethod(cartSpeech, "findFromCache", speakSB, 220, SpeechSynth.VoicingSource.natural, false);
+                SpeechClip speechClip = (SpeechClip)ReflectionHelper.InvokePrivateMethod(cartSpeech, "findFromCache", speakSB, CartTTSVoiceFrequency, SpeechSynth.VoicingSource.natural, false);
                 if (speechClip == null)
                 {
-                    cartSpeech.pregenerate(out speechClip, 220, SpeechSynth.VoicingSource.natural, speakSB, false, addToCache: true);
+                    cartSpeech.pregenerate(out speechClip, CartTTSVoiceFrequency, SpeechSynth.VoicingSource.natural, speakSB, false, addToCache: true);
                 }
 
                 if (speechClip != null)
@@ -558,6 +709,7 @@ namespace TalkingCart.Patches
         {
             // If comms is off, return.
             if (!isCommEnabled) return;
+            if (audioClip == null) return;
 
             cartVoiceQueue.Enqueue(audioClip);
             cartVoiceDelayQueue.Enqueue(delay);

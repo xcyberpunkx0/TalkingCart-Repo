@@ -25,6 +25,7 @@ namespace TalkingCart
         public static ManualLogSource mls;
 
         public static List<AudioClip> SoundFX;
+        public static Dictionary<string, AudioClip> SoundFXByName;
         public static List<AudioClip> RoastsFX;
         public static List<string> RoastsText;
         internal static AssetBundle Bundle1;
@@ -70,12 +71,17 @@ namespace TalkingCart
             harmony.PatchAll(typeof(PhysGrabObjectPatch));
 
             SoundFX = new List<AudioClip>();
+            SoundFXByName = new Dictionary<string, AudioClip>();
             string FolderLocation = Instance.Info.Location;
             FolderLocation = FolderLocation.TrimEnd("TalkingCart.dll".ToCharArray());
             Bundle1 = AssetBundle.LoadFromFile(FolderLocation + "talkingcartassetbundle");
             if (Bundle1 != null)
             {
                 SoundFX = Bundle1.LoadAllAssets<AudioClip>().ToList();
+                SoundFXByName = SoundFX
+                    .Where(clip => clip != null && !string.IsNullOrEmpty(clip.name))
+                    .GroupBy(clip => clip.name)
+                    .ToDictionary(group => group.Key, group => group.First());
                 mls.LogInfo($"Audio Array Size: {SoundFX.Count}");
             }
             else mls.LogError("Failed to load asset bundle1 !!");

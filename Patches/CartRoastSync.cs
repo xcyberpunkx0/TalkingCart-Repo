@@ -33,8 +33,6 @@ namespace TalkingCart.Patches
 
             if (rand == 34)
             {
-                int clownNearbyInd = TalkingCartBase.EnemyNearbyInd + 4;
-
                 inds.Add(-1);
                 delays.Add(2);
             }
@@ -63,8 +61,16 @@ namespace TalkingCart.Patches
                         foreach (AudioClip audioClip in audioClips) cart.EnqueueValues(audioClip, delays[i], fullText);
                     } else
                     {
-                        int clownNearbyInd = TalkingCartBase.EnemyNearbyInd + 4;
-                        cart.EnqueueValues(TalkingCartBase.SoundFX[clownNearbyInd], delays[i], "Clown nearby");
+                        if (TalkingCartBase.SoundFXByName != null && TalkingCartBase.SoundFXByName.TryGetValue("clown_nearby", out AudioClip clownNearby))
+                        {
+                            cart.EnqueueValues(clownNearby, delays[i], "Clown nearby");
+                        }
+                        else
+                        {
+                            string fullText = "Clown nearby";
+                            List<AudioClip> audioClips = cart.TTSGenerateAudioClip(fullText);
+                            foreach (AudioClip audioClip in audioClips) cart.EnqueueValues(audioClip, delays[i], fullText);
+                        }
                     }
                 } else
                 {

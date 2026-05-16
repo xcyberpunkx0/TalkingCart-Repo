@@ -1,6 +1,6 @@
 {
     "name": "TalkingCart",
-    "version_number": "1.5.0",
+    "version_number": "1.6.0",
     "website_url": "https://github.com/xcyberpunkx0/TalkingCart-Repo",
     "description": "Makes the shopping cart warn you about nearby enemies, announce deaths and despawns, react to item damage, and report nearby item counts.",
     "dependencies": [

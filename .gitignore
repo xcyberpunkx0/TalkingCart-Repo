@@ -1,0 +1,21 @@
+# Build artifacts
+bin/
+obj/
+
+# Project build config (local only)
+TalkingCart.csproj
+
+# Distribution package
+TalkingCart-1.5.0.zip
+TalkingCart-1.6.0.zip
+
+# Local inspection tools
+.tools/
+
+# Claude Code session files
+.claude/
+
+# Build progress notes
+BUILD_PROGRESS.md
+
+CLAUDE.md
