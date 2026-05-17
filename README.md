@@ -1,6 +1,6 @@
 # Cart Talking Mod
 
-> **This is an updated and maintained fork of the original TalkingCart mod by Syntaxe. The original mod is no longer being maintained, so this version has been updated to be compatible with the latest game update, fixing broken field references and adding support for newer enemies added since the original release.**
+> **This is an updated and maintained fork of the original [TalkingCart mod by Syntaxe](https://thunderstore.io/c/repo/p/Syntaxe/TalkingCart/). The original mod is no longer being maintained, so this version has been updated to be compatible with the latest game update, fixing broken field references and adding support for newer enemies added since the original release.**
 
 This mod makes the cart talk with voice and subtitles. The cart will warn the players when an enemy is nearby, let you know when an enemy has despawned/respawned, and tell you how many items are in the vicinity.
 
@@ -40,3 +40,11 @@ Please report bugs, wrong enemy announcements, or compatibility issues on GitHub
 # Mod Type
 
 Client-side.
+
+# Attribution
+
+This mod is based on the original **TalkingCart** by **Syntaxe**:
+- [Original Thunderstore listing](https://thunderstore.io/c/repo/p/Syntaxe/TalkingCart/)
+- [Original YouTube showcase](https://youtu.be/naOCUkJkmzk)
+
+All original code, voice assets, and design are the work of Syntaxe. This fork exists solely to maintain compatibility while the original maintainer is unreachable. If Syntaxe returns and wishes to take over maintenance, this fork will defer to the original.
