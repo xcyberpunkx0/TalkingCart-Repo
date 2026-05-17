@@ -48,3 +48,5 @@ This mod is based on the original **TalkingCart** by **Syntaxe**:
 - [Original YouTube showcase](https://youtu.be/naOCUkJkmzk)
 
 All original code, voice assets, and design are the work of Syntaxe. This fork exists solely to maintain compatibility while the original maintainer is unreachable. If Syntaxe returns and wishes to take over maintenance, this fork will defer to the original.
+
+*Note: This is my first time maintaining a mod. Attribution was not included in the initial release out of inexperience, not intent — I've since added it and will keep it going forward.*
