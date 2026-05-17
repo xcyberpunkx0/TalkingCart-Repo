@@ -47,6 +47,8 @@ This mod is based on the original **TalkingCart** by **Syntaxe**:
 - [Original Thunderstore listing](https://thunderstore.io/c/repo/p/Syntaxe/TalkingCart/)
 - [Original YouTube showcase](https://youtu.be/naOCUkJkmzk)
 
-All original code, voice assets, and design are the work of Syntaxe. This fork exists solely to maintain compatibility while the original maintainer is unreachable. If Syntaxe returns and wishes to take over maintenance, this fork will defer to the original.
+All original code, voice assets and design belong to Syntaxe. This fork only exists to keep things working while the original maintainer is away. If Syntaxe comes back and wants to take over again, this fork will step aside.
 
-*Note: This is my first time maintaining a mod. Attribution was not included in the initial release out of inexperience, not intent — I've since added it and will keep it going forward.*
+*Note: This is my first time maintaining a mod. I didn't include attribution at first because I didn't know about it, not because I was trying to hide anything. I've added it now and will keep it going forward.*
+
+*The mod icon was made with an AI image generator. The mod code itself is hand-written.*
